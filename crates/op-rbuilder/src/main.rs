@@ -88,7 +88,7 @@ where
             payload_job_config,
             // FBPayloadBuilder::new(OpEvmConfig::new(ctx.chain_spec())),
             //vanilla_builder,
-            _fb_builder
+            _fb_builder,
         );
 
         let (payload_service, payload_builder) =

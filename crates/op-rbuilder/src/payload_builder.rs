@@ -46,8 +46,8 @@ use reth_optimism_payload_builder::error::OpPayloadBuilderError;
 use reth_optimism_payload_builder::payload::{OpBuiltPayload, OpPayloadBuilderAttributes};
 use reth_transaction_pool::pool::BestPayloadTransactions;
 
-use reth_rpc_types_compat::engine::payload::block_to_payload_v3;
 use op_alloy_rpc_types_engine::{OpExecutionPayloadEnvelopeV3, OpExecutionPayloadEnvelopeV4};
+use reth_rpc_types_compat::engine::payload::block_to_payload_v3;
 
 use tokio::sync::broadcast;
 
@@ -58,18 +58,17 @@ use tokio_stream::StreamExt;
 use axum::{
     response::{IntoResponse, Sse},
     routing::get,
-    Router,
-    Server
+    Router, Server,
 };
 
-static PAYLOAD_BROADCASTER: Lazy<PayloadBroadcaster> = Lazy::new(|| {
-    PayloadBroadcaster::new()
-});
-
+static PAYLOAD_BROADCASTER: Lazy<PayloadBroadcaster> = Lazy::new(|| PayloadBroadcaster::new());
+use reth::core::primitives::SignedTransaction;
 
 #[derive(Clone)]
 pub struct PayloadStreamUpdate {
     pub built_payload: OpBuiltPayload,
+    pub tx_hashes: Vec<B256>,
+    pub receipts: Vec<OpReceipt>,
     pub timestamp: u64,
 }
 
@@ -103,19 +102,30 @@ impl PayloadBroadcaster {
     }
 }
 
+#[derive(Serialize)]
+struct PayloadUpdate {
+    payload: OpExecutionPayloadEnvelopeV4,
+    receipts: Vec<OpReceipt>,
+    tx_hashes: Vec<B256>,
+}
+
 async fn sse_handler() -> Sse<impl Stream<Item = Result<Event, Infallible>>> {
     let rx = PayloadBroadcaster::instance().sender.subscribe();
-    
-    let stream = BroadcastStream::new(rx).map(|msg| {
-        match msg {
-            Ok(payload) => {
-                let payload_envelope = OpExecutionPayloadEnvelopeV4::from(payload.built_payload);
 
-                let json = serde_json::to_string(&payload_envelope).unwrap();
-                Ok(axum::response::sse::Event::default().data(json))
-            }
-            Err(_err) => Ok(axum::response::sse::Event::default().data("error".to_string()))
+    let stream = BroadcastStream::new(rx).map(|msg| match msg {
+        Ok(payload) => {
+            let payload_envelope = OpExecutionPayloadEnvelopeV4::from(payload.built_payload);
+            let receipts = payload.receipts.clone();
+            let payload_update = PayloadUpdate {
+                payload: payload_envelope,
+                receipts: receipts,
+                tx_hashes: payload.tx_hashes,
+            };
+
+            let json = serde_json::to_string(&payload_update).unwrap();
+            Ok(axum::response::sse::Event::default().data(json))
         }
+        Err(_err) => Ok(axum::response::sse::Event::default().data("error".to_string())),
     });
 
     Sse::new(stream)
@@ -142,7 +152,10 @@ impl<EvmConfig> OpPayloadBuilder<EvmConfig> {
         tracing::info!("Starting server on {}", addr);
 
         tokio::spawn(async move {
-            Server::bind(&addr).serve(app.into_make_service()).await.unwrap();
+            Server::bind(&addr)
+                .serve(app.into_make_service())
+                .await
+                .unwrap();
         });
 
         Self {
@@ -280,6 +293,8 @@ where
             // set up a stream to stream out the best_payload to subscribers
             let update = PayloadStreamUpdate {
                 built_payload: best_payload.get().unwrap(),
+                tx_hashes: info.executed_transactions.iter().map(|tx| *tx.tx_hash()).collect(),
+                receipts: info.receipts.clone(),
                 timestamp: ctx.attributes().timestamp(),
             };
 
