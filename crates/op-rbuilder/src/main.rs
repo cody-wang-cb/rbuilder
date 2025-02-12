@@ -82,10 +82,10 @@ where
         let flashblock_payload_builder = OpPayloadBuilder::new(OpEvmConfig::new(ctx.chain_spec()));
 
         // Start WebSocket server
-        if let Err(e) = flashblock_payload_builder.start_ws("127.0.0.1:6666").await {
+        if let Err(e) = flashblock_payload_builder.start_ws("127.0.0.1:8546").await {
             tracing::warn!("Failed to start WebSocket server: {}", e);
         } else {
-            tracing::info!("FB websocket server started on 127.0.0.1:6666");
+            tracing::info!("FB websocket server started on 127.0.0.1:8546");
         }
         
 
