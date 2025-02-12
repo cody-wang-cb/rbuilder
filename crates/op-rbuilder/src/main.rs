@@ -2,6 +2,7 @@ use clap::Parser;
 use generator::BlockPayloadJobGenerator;
 use monitoring::Monitoring;
 use payload_builder_vanilla::OpPayloadBuilderVanilla;
+use payload_builder::OpPayloadBuilder;
 use reth::builder::Node;
 use reth::{
     builder::{components::PayloadServiceBuilder, node::FullNodeTypes, BuilderContext},
@@ -78,23 +79,22 @@ where
         );
         let payload_job_config = BasicPayloadJobGeneratorConfig::default();
 
-        /*
-        let payload_builder = FBPayloadBuilder::new(OpEvmConfig::new(ctx.chain_spec()));
+        let flashblock_payload_builder = OpPayloadBuilder::new(OpEvmConfig::new(ctx.chain_spec()));
 
         // Start WebSocket server
-        if let Err(e) = payload_builder.start_ws("127.0.0.1:1111").await {
+        if let Err(e) = flashblock_payload_builder.start_ws("127.0.0.1:6666").await {
             tracing::warn!("Failed to start WebSocket server: {}", e);
         } else {
-            tracing::info!("FB websocket server started on 127.0.0.1:1111");
+            tracing::info!("FB websocket server started on 127.0.0.1:6666");
         }
-        */
+        
 
         let payload_generator = BlockPayloadJobGenerator::with_builder(
             ctx.provider().clone(),
             pool,
             ctx.task_executor().clone(),
             payload_job_config,
-            vanilla_builder,
+            flashblock_payload_builder,
             true,
         );
 

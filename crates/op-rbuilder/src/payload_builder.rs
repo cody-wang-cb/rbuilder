@@ -49,6 +49,7 @@ use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::mpsc;
 use tokio_tungstenite::accept_async;
 use tokio_tungstenite::WebSocketStream;
+use reth::core::primitives::SignedTransaction;
 
 /// Optimism's payload builder
 #[derive(Debug, Clone)]
@@ -203,9 +204,18 @@ where
         let (payload, mut bundle_state) = build_block(db, &ctx, &info)?;
 
         best_payload.set(payload.clone());
-        let _ = self.send_message(
-            serde_json::to_string(&OpExecutionPayloadEnvelopeV3::from(payload)).unwrap_or_default(),
-        );
+        // send receipts, tx_hashes, and payload envelope
+        let receipts = info.receipts.clone();
+        let tx_hashes = info.executed_transactions.iter().map(|tx| *tx.tx_hash()).collect::<Vec<B256>>();
+        let payload_envelope = OpExecutionPayloadEnvelopeV3::from(payload);
+        // 
+        let message = serde_json::to_string(&serde_json::json!({
+            "response": payload_envelope,
+            "receipts": receipts,
+            "tx_hashes": tx_hashes
+        })).unwrap_or_default();
+
+        let _ = self.send_message(message);
 
         tracing::info!(target: "payload_builder", "Fallback block built");
 
@@ -265,10 +275,19 @@ where
             let (payload, new_bundle_state) = build_block(db, &ctx, &info)?;
 
             best_payload.set(payload.clone());
-            let _ = self.send_message(
-                serde_json::to_string(&OpExecutionPayloadEnvelopeV3::from(payload))
-                    .unwrap_or_default(),
-            );
+
+            // send receipts, tx_hashes, and payload envelope
+            let receipts = info.receipts.clone();
+            let tx_hashes = info.executed_transactions.iter().map(|tx| *tx.tx_hash()).collect::<Vec<B256>>();
+            let payload_envelope = OpExecutionPayloadEnvelopeV3::from(payload);
+            // 
+            let message = serde_json::to_string(&serde_json::json!({
+                "response": payload_envelope,
+                "receipts": receipts,
+                "tx_hashes": tx_hashes
+            })).unwrap_or_default();
+
+            let _ = self.send_message(message);
 
             bundle_state = new_bundle_state;
             total_gas_per_batch += gas_per_batch;
