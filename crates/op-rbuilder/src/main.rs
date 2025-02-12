@@ -1,7 +1,8 @@
+use axum::Server;
 use clap::Parser;
 use generator::BlockPayloadJobGenerator;
 use monitoring::Monitoring;
-use payload_builder::OpPayloadBuilder as FBPayloadBuilder;
+use payload_builder::{OpPayloadBuilder as FBPayloadBuilder, PayloadBroadcaster};
 use payload_builder_vanilla::OpPayloadBuilderVanilla;
 use reth::builder::Node;
 use reth::{
@@ -86,7 +87,8 @@ where
             ctx.task_executor().clone(),
             payload_job_config,
             // FBPayloadBuilder::new(OpEvmConfig::new(ctx.chain_spec())),
-            vanilla_builder,
+            //vanilla_builder,
+            _fb_builder
         );
 
         let (payload_service, payload_builder) =

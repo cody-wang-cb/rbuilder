@@ -1,3 +1,5 @@
+use std::convert::Infallible;
+use std::net::SocketAddr;
 use std::{fmt::Display, sync::Arc};
 
 use crate::generator::{BlockCell, PayloadBuilder};
@@ -5,6 +7,8 @@ use alloy_consensus::{Eip658Value, Header, Transaction, Typed2718, EMPTY_OMMER_R
 use alloy_eips::merge::BEACON_NONCE;
 use alloy_primitives::{Address, Bytes, B256, U256};
 use alloy_rpc_types_engine::PayloadId;
+use axum::response::sse::Event;
+use futures_util::Stream;
 use op_alloy_consensus::{OpDepositReceipt, OpTxType};
 use reth_basic_payload_builder::*;
 use reth_chainspec::ChainSpecProvider;
@@ -35,11 +39,87 @@ use revm::{
     },
     Database, DatabaseCommit,
 };
-use tracing::{debug, trace, warn};
+use serde::{Deserialize, Serialize};
+use tracing::{debug, info, trace, warn};
 
 use reth_optimism_payload_builder::error::OpPayloadBuilderError;
 use reth_optimism_payload_builder::payload::{OpBuiltPayload, OpPayloadBuilderAttributes};
 use reth_transaction_pool::pool::BestPayloadTransactions;
+
+use reth_rpc_types_compat::engine::payload::block_to_payload_v3;
+use op_alloy_rpc_types_engine::{OpExecutionPayloadEnvelopeV3, OpExecutionPayloadEnvelopeV4};
+
+use tokio::sync::broadcast;
+
+use once_cell::sync::Lazy;
+use tokio_stream::wrappers::BroadcastStream;
+use tokio_stream::StreamExt;
+
+use axum::{
+    response::{IntoResponse, Sse},
+    routing::get,
+    Router,
+    Server
+};
+
+static PAYLOAD_BROADCASTER: Lazy<PayloadBroadcaster> = Lazy::new(|| {
+    PayloadBroadcaster::new()
+});
+
+
+#[derive(Clone)]
+pub struct PayloadStreamUpdate {
+    pub built_payload: OpBuiltPayload,
+    pub timestamp: u64,
+}
+
+pub struct PayloadBroadcaster {
+    sender: broadcast::Sender<PayloadStreamUpdate>,
+    _permanent_receiver: Arc<broadcast::Receiver<PayloadStreamUpdate>>,
+}
+
+impl PayloadBroadcaster {
+    fn new() -> Self {
+        let (sender, receiver) = broadcast::channel(100);
+        Self {
+            sender: sender,
+            _permanent_receiver: Arc::new(receiver),
+        }
+    }
+
+    pub fn instance() -> &'static PayloadBroadcaster {
+        &PAYLOAD_BROADCASTER
+    }
+
+    pub fn broadcast(&self, payload: PayloadStreamUpdate) {
+        if let Err(e) = self.sender.send(payload) {
+            info!("Failed to send payload update: {}", e);
+        }
+        info!("Payload update sent");
+    }
+
+    pub fn router() -> Router {
+        Router::new().route("/sse", get(sse_handler))
+    }
+}
+
+async fn sse_handler() -> Sse<impl Stream<Item = Result<Event, Infallible>>> {
+    let rx = PayloadBroadcaster::instance().sender.subscribe();
+    
+    let stream = BroadcastStream::new(rx).map(|msg| {
+        match msg {
+            Ok(payload) => {
+                let payload_envelope = OpExecutionPayloadEnvelopeV4::from(payload.built_payload);
+
+                let json = serde_json::to_string(&payload_envelope).unwrap();
+                Ok(axum::response::sse::Event::default().data(json))
+            }
+            Err(_err) => Ok(axum::response::sse::Event::default().data("error".to_string()))
+        }
+    });
+
+    Sse::new(stream)
+}
 
 /// Optimism's payload builder
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -56,7 +136,15 @@ pub struct OpPayloadBuilder<EvmConfig, Txs = ()> {
 
 impl<EvmConfig> OpPayloadBuilder<EvmConfig> {
     /// `OpPayloadBuilder` constructor.
-    pub const fn new(evm_config: EvmConfig) -> Self {
+    pub fn new(evm_config: EvmConfig) -> Self {
+        let app = PayloadBroadcaster::router();
+        let addr = ([127, 0, 0, 1], 10000).into();
+        tracing::info!("Starting server on {}", addr);
+
+        tokio::spawn(async move {
+            Server::bind(&addr).serve(app.into_make_service()).await.unwrap();
+        });
+
         Self {
             compute_pending_block: true,
             evm_config,
@@ -188,6 +276,14 @@ where
             bundle_state = new_bundle_state;
             total_gas_per_batch += gas_per_batch;
             flashblock_count += 1;
+
+            // set up a stream to stream out the best_payload to subscribers
+            let update = PayloadStreamUpdate {
+                built_payload: best_payload.get().unwrap(),
+                timestamp: ctx.attributes().timestamp(),
+            };
+
+            PayloadBroadcaster::instance().broadcast(update);
 
             std::thread::sleep(std::time::Duration::from_millis(250));
         }
@@ -327,7 +423,7 @@ where
 
     let withdrawals = Some(ctx.attributes().payload_attributes.withdrawals().clone());
     // seal the block
-    let block = Block {
+    let block: alloy_consensus::Block<OpTransactionSigned> = Block {
         header,
         body: BlockBody {
             transactions: info.executed_transactions.clone(),

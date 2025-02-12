@@ -47,7 +47,7 @@ impl Default for EngineApiBuilder {
 impl EngineApiBuilder {
     pub fn new() -> Self {
         Self {
-            url: String::from("http://localhost:8551"), // default value
+            url: String::from("http://localhost:4444"), // default value
             jwt_secret: String::from(
                 "688f5d737bad920bdfb2fc2f488d6b6209eebda1dae949a8de91398d932c517a",
             ), // default value
