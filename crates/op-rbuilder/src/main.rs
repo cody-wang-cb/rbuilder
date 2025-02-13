@@ -86,10 +86,10 @@ where
         let flashblock_payload_builder = OpPayloadBuilder::new(OpEvmConfig::new(ctx.chain_spec()));
 
         // Start WebSocket server
-        if let Err(e) = flashblock_payload_builder.start_ws(&format!("127.0.0.1:{}", self.flashblocks_websocket_port)).await {
+        if let Err(e) = flashblock_payload_builder.start_ws(&format!("0.0.0.0:{}", self.flashblocks_websocket_port)).await {
             tracing::warn!("Failed to start WebSocket server: {}", e);
         } else {
-            tracing::info!("FB websocket server started on 127.0.0.1:{}", self.flashblocks_websocket_port);
+            tracing::info!("FB websocket server started on 0.0.0.0:{}", self.flashblocks_websocket_port);
         }
 
         let payload_generator = BlockPayloadJobGenerator::with_builder(
