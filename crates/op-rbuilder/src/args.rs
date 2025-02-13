@@ -17,4 +17,8 @@ pub struct OpRbuilderArgs {
     /// Builder secret key for signing last transaction in block
     #[arg(long = "rollup.builder-secret-key", env = "BUILDER_SECRET_KEY")]
     pub builder_signer: Option<Signer>,
+
+    /// Websocket port for flashblock payload builder
+    #[arg(long = "rollup.flashblocks-websocket-port", env = "FLASHBLOCKS_WEBSOCKET_PORT", default_value = "2545")]
+    pub flashblocks_websocket_port: u16,
 }

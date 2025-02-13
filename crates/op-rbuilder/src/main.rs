@@ -46,11 +46,15 @@ mod tx_signer;
 #[non_exhaustive]
 pub struct CustomPayloadBuilder {
     builder_secret_key: Option<Signer>,
+    flashblocks_websocket_port: u16
 }
 
 impl CustomPayloadBuilder {
-    pub fn new(builder_secret_key: Option<Signer>) -> Self {
-        Self { builder_secret_key }
+    pub fn new(builder_secret_key: Option<Signer>, flashblocks_websocket_port: u16) -> Self {
+        Self {
+            builder_secret_key,
+            flashblocks_websocket_port,
+        }
     }
 }
 
@@ -82,12 +86,11 @@ where
         let flashblock_payload_builder = OpPayloadBuilder::new(OpEvmConfig::new(ctx.chain_spec()));
 
         // Start WebSocket server
-        if let Err(e) = flashblock_payload_builder.start_ws("127.0.0.1:8546").await {
+        if let Err(e) = flashblock_payload_builder.start_ws(&format!("127.0.0.1:{}", self.flashblocks_websocket_port)).await {
             tracing::warn!("Failed to start WebSocket server: {}", e);
         } else {
-            tracing::info!("FB websocket server started on 127.0.0.1:8546");
+            tracing::info!("FB websocket server started on 127.0.0.1:{}", self.flashblocks_websocket_port);
         }
-        
 
         let payload_generator = BlockPayloadJobGenerator::with_builder(
             ctx.provider().clone(),
@@ -125,7 +128,7 @@ fn main() {
                 .with_components(
                     op_node
                         .components()
-                        .payload(CustomPayloadBuilder::new(builder_args.builder_signer)),
+                        .payload(CustomPayloadBuilder::new(builder_args.builder_signer, builder_args.flashblocks_websocket_port)),
                 )
                 .with_add_ons(op_node.add_ons())
                 /*
