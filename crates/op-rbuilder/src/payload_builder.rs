@@ -3,7 +3,7 @@ use std::{fmt::Display, sync::Arc, sync::Mutex};
 use crate::generator::{BlockCell, BuildArguments, PayloadBuilder};
 use alloy_consensus::{Eip658Value, Header, Transaction, Typed2718, EMPTY_OMMER_ROOT_HASH};
 use alloy_eips::merge::BEACON_NONCE;
-use alloy_primitives::{Address, Bytes, B256, U256};
+use alloy_primitives::{Address, Bytes, B256, U256, map::HashMap};
 use alloy_rpc_types_engine::PayloadId;
 use op_alloy_consensus::{OpDepositReceipt, OpTxType};
 use reth_basic_payload_builder::*;
@@ -208,11 +208,15 @@ where
         let receipts = info.receipts.clone();
         let tx_hashes = info.executed_transactions.iter().map(|tx| *tx.tx_hash()).collect::<Vec<B256>>();
         let payload_envelope = OpExecutionPayloadEnvelopeV3::from(payload);
-        // 
+        let new_account_balances = bundle_state.state.iter()
+                .filter_map(|(address, account)| account.info.as_ref().map(|info| (*address, info.balance)))
+                .collect::<HashMap<Address, U256>>();
+
         let message = serde_json::to_string(&serde_json::json!({
             "response": payload_envelope,
             "receipts": receipts,
-            "tx_hashes": tx_hashes
+            "tx_hashes": tx_hashes,
+            "new_account_balances": new_account_balances
         })).unwrap_or_default();
 
         let _ = self.send_message(message);
@@ -280,11 +284,15 @@ where
             let receipts = info.receipts.clone();
             let tx_hashes = info.executed_transactions.iter().map(|tx| *tx.tx_hash()).collect::<Vec<B256>>();
             let payload_envelope = OpExecutionPayloadEnvelopeV3::from(payload);
+            let new_account_balances = new_bundle_state.state.iter()
+                .filter_map(|(address, account)| account.info.as_ref().map(|info| (*address, info.balance)))
+                .collect::<HashMap<Address, U256>>();
             // 
             let message = serde_json::to_string(&serde_json::json!({
                 "response": payload_envelope,
                 "receipts": receipts,
-                "tx_hashes": tx_hashes
+                "tx_hashes": tx_hashes,
+                "new_account_balances": new_account_balances,
             })).unwrap_or_default();
 
             let _ = self.send_message(message);
