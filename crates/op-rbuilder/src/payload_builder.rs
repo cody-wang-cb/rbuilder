@@ -275,11 +275,13 @@ impl<Pool, Client> OpPayloadBuilder<Pool, Client> {
         let subscribers = subscribers.clone();
 
         tracing::info!("Starting WebSocket server on {}", addr);
+        let metrics = OpRBuilderMetrics::default();
 
         while let Ok((stream, _)) = listener.accept().await {
             tracing::info!("Accepted websocket connection");
             let subscribers = subscribers.clone();
 
+            metrics.new_connections.increment(1);
             tokio::spawn(async move {
                 match accept_async(stream).await {
                     Ok(ws_stream) => {
@@ -498,9 +500,10 @@ where
                     // Continue with flashblock building
                     tracing::info!(
                         target: "payload_builder",
-                        "Building flashblock {} {}",
+                        "Building flashblock {} {} {}",
                         flashblock_count,
                         total_gas_per_batch,
+                        ctx.block_number()
                     );
 
                     let flashblock_build_start_time = Instant::now();
@@ -1206,7 +1209,10 @@ where
                 num_txs_simulated_success += 1;
             } else {
                 num_txs_simulated_fail += 1;
-                trace!(target: "payload_builder", ?tx, "reverted transaction");
+                trace!(target: "payload_builder", ?tx, "skipping reverted transaction");
+                best_txs.mark_invalid(tx.signer(), tx.nonce());
+                info.invalid_tx_hashes.insert(tx.tx_hash());
+                continue;
             }
 
             // add gas used by the transaction to cumulative gas used, before creating the receipt

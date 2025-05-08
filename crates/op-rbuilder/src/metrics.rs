@@ -56,6 +56,8 @@ pub struct OpRBuilderMetrics {
     pub tx_byte_size: Histogram,
     /// Number of reverted transactions
     pub num_reverted_tx: Counter,
+    /// Number of new connections
+    pub new_connections: Counter,
 }
 
 impl OpRBuilderMetrics {
