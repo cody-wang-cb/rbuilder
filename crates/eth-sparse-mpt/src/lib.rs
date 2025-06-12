@@ -72,7 +72,7 @@ pub struct SparseTrieSharedCache {
 
 impl SparseTrieSharedCache {
     pub fn new_with_parent_block_data(parent_block_hash: B256, parent_state_root: B256) -> Self {
-        let cache_v1 = v1::reth_sparse_trie::SparseTrieSharedCache::new_with_parent_state_root(
+        let cache_v1: v1::reth_sparse_trie::SparseTrieSharedCache = v1::reth_sparse_trie::SparseTrieSharedCache::new_with_parent_state_root(
             parent_state_root,
         );
         let mut cache_v2 = v2::SharedCacheV2::default();

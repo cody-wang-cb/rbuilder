@@ -67,7 +67,7 @@ impl MissingNodesFetcher {
                         .map_err(SparseTrieError::other)?;
                     if !last_block_hash.is_zero() {
                         let block_number = provider
-                            .last_block_number()
+                            .best_block_number()
                             .map_err(SparseTrieError::other)?;
                         let block_hash = provider
                             .block_hash(block_number)
@@ -106,7 +106,7 @@ impl MissingNodesFetcher {
             .map_err(SparseTrieError::other)?;
         if !last_block_hash.is_zero() {
             let block_number = provider
-                .last_block_number()
+                .best_block_number()
                 .map_err(SparseTrieError::other)?;
             let block_hash = provider
                 .block_hash(block_number)
