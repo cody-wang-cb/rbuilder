@@ -16,6 +16,7 @@ use reth_trie::{
     MultiProofTargets,
 };
 use reth_trie_db::{DatabaseHashedCursorFactory, DatabaseTrieCursorFactory};
+use tracing::info;
 
 use super::SharedCacheV2;
 
@@ -72,6 +73,8 @@ impl MissingNodesFetcher {
                         let block_hash = provider
                             .block_hash(block_number)
                             .map_err(SparseTrieError::other)?;
+                        info!("(storage) block hash: {:?}", block_hash);
+                        info!("(storage) shared cache last block hash: {:?}", shared_cache.last_block_hash);
                         if block_hash != Some(shared_cache.last_block_hash) {
                             return Err(SparseTrieError::WrongDatabaseTrieError);
                         }
@@ -111,6 +114,8 @@ impl MissingNodesFetcher {
             let block_hash = provider
                 .block_hash(block_number)
                 .map_err(SparseTrieError::other)?;
+            info!("block hash: {:?}", block_hash);
+            info!("shared cache last block hash: {:?}", shared_cache.last_block_hash);
             if block_hash != Some(shared_cache.last_block_hash) {
                 return Err(SparseTrieError::WrongDatabaseTrieError);
             }
