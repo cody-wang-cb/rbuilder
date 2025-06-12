@@ -278,7 +278,7 @@ impl RootHashCalculator {
         }
     }
 
-    fn prepare_changes_for_storage_trie(&mut self, outcome: &ExecutionOutcome) -> eyre::Result<()> {
+    fn prepare_changes_for_storage_trie<T>(&mut self, outcome: &ExecutionOutcome<T>) -> eyre::Result<()> {
         self.changed_account.write().clear();
 
         outcome
@@ -856,11 +856,11 @@ impl RootHashCalculator {
         hash
     }
 
-    pub fn calculate_root_hash_with_sparse_trie<Provider>(
+    pub fn calculate_root_hash_with_sparse_trie<Provider, T>(
         &mut self,
         consistent_db_view: ConsistentDbView<Provider>,
         shared_cache: SharedCacheV2,
-        outcome: &ExecutionOutcome,
+        outcome: &ExecutionOutcome<T>,
     ) -> Result<(B256, SparseTrieMetrics), SparseTrieError>
     where
         Provider: DatabaseProviderFactory<Provider: BlockReader> + Send + Sync,
@@ -872,7 +872,7 @@ impl RootHashCalculator {
         self.shared_cache = shared_cache.clone();
 
         stats.start();
-        self.prepare_changes_for_storage_trie(outcome)?;
+        self.prepare_changes_for_storage_trie::<T>(outcome)?;
         stats.measure_prepare(true);
         self.do_first_fetch(&consistent_db_view, &mut stats)?;
 

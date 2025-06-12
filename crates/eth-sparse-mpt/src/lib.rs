@@ -152,6 +152,7 @@ pub fn calculate_root_hash_with_sparse_trie<Provider, T>(
 where
     Provider: DatabaseProviderFactory<Provider: BlockReader> + Send + Sync,
     Provider: StateCommitmentProvider,
+    T: Send + Sync,
 {
     if let Some(thread_pool) = thread_pool {
         thread_pool.rayon_pool.install(|| {
@@ -174,9 +175,9 @@ where
     }
 }
 
-pub fn calculate_root_hash_with_sparse_trie_internal<Provider>(
+pub fn calculate_root_hash_with_sparse_trie_internal<Provider, T>(
     consistent_db_view: ConsistentDbView<Provider>,
-    outcome: &ExecutionOutcome,
+    outcome: &ExecutionOutcome<T>,
     shared_cache: &SparseTrieSharedCache,
     local_cache: &mut SparseTrieLocalCache,
     version: ETHSpareMPTVersion,

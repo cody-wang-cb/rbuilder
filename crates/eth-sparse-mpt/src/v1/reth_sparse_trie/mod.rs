@@ -104,9 +104,9 @@ where
 /// Calculate root hash for the given outcome on top of the block defined by consistent_db_view.
 /// * shared_cache should be created once for each parent block and it stores fetched parts of the trie
 /// * It uses rayon for parallelism and the thread pool should be configured from outside.
-pub fn calculate_root_hash_with_sparse_trie<Provider>(
+pub fn calculate_root_hash_with_sparse_trie<Provider, T>(
     consistent_db_view: ConsistentDbView<Provider>,
-    outcome: &ExecutionOutcome,
+    outcome: &ExecutionOutcome<T>,
     shared_cache: SparseTrieSharedCache,
 ) -> (Result<B256, SparseTrieError>, SparseTrieMetrics)
 where
