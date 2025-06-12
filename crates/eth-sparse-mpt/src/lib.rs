@@ -141,9 +141,9 @@ impl SparseTrieError {
     }
 }
 
-pub fn calculate_root_hash_with_sparse_trie<Provider>(
+pub fn calculate_root_hash_with_sparse_trie<Provider, T>(
     consistent_db_view: ConsistentDbView<Provider>,
-    outcome: &ExecutionOutcome,
+    outcome: &ExecutionOutcome<T>,
     shared_cache: &SparseTrieSharedCache,
     local_cache: &mut SparseTrieLocalCache,
     thread_pool: &Option<RootHashThreadPool>,
