@@ -75,7 +75,9 @@ impl MissingNodesFetcher {
                             .map_err(SparseTrieError::other)?;
                         info!("(storage) block number: {:?}", block_number);
                         let last_block_number = provider.last_block_number().map_err(SparseTrieError::other)?;
+                        let last_block_hash = provider.block_hash(last_block_number).map_err(SparseTrieError::other)?;
                         info!("(storage) last block number: {:?}", last_block_number);
+                        info!("(storage) last block hash: {:?}", last_block_hash);
                         info!("(storage) block hash: {:?}", block_hash);
                         info!("(storage) shared cache last block hash: {:?}", shared_cache.last_block_hash);
                         if block_hash != Some(shared_cache.last_block_hash) {
